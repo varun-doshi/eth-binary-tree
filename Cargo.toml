@@ -1,0 +1,8 @@
+[package]
+name = "eth-binary-tree"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+blake3 = "1.5.5"
+hex = "0.4.3"

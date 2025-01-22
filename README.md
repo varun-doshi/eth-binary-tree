@@ -20,4 +20,7 @@ Shoutout to:</br>
 
 For the original proposal
 
+
+Currently contains the implementation of the `tree`. Implementation of the `account embedding` will be added soon.
+
 ### Disclaimer: This is just a minimal conversion of the python specs from the original proposal created as a POC. Do not use in production.

@@ -1,7 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use eth_binary_tree::{BinaryTree, InternalNode, TreeNode};
+    use eth_binary_tree::tree::{BinaryTree, InternalNode, TreeNode};
     use hex;
 
     fn get_height(node: Option<&TreeNode>) -> usize {
@@ -186,7 +185,7 @@ mod tests {
 
         for (i, key) in keys.iter().enumerate() {
             let mut value = [0u8; 32];
-            value[0] = (i + 1) as u8; 
+            value[0] = (i + 1) as u8;
             tree.insert(*key, value);
         }
         let got = tree.merkelize();

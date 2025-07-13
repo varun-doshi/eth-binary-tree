@@ -41,6 +41,14 @@ pub enum TreeNode {
 }
 
 #[derive(Debug)]
+pub struct MerkleProof {
+    pub path: Vec<[u8; 32]>, // sibling hashes from root to leaf
+    pub value: Option<Vec<u8>>,
+    pub subindex: usize,
+    pub stem: [u8; 31],
+}
+
+#[derive(Debug)]
 pub struct BinaryTree {
     pub root: Option<TreeNode>,
 }
@@ -227,4 +235,150 @@ impl BinaryTree {
 
         _merkelize(&self.root, &Self::hash)
     }
+
+    pub fn get_proof(&self, key: [u8; 32]) -> Option<MerkleProof> {
+        let stem: [u8; 31] = key[..31].try_into().ok()?;
+        let subindex = key[31] as usize;
+        let stem_bits = self.bytes_to_bits(&stem);
+
+        let mut path = Vec::new();
+        let mut current = self.root.as_ref()?;
+        let mut depth = 0;
+
+        while let TreeNode::Internal(node) = current {
+            let bit = stem_bits.get(depth)?;
+            let (next_node, sibling) = if *bit == 0 {
+                (&node.left, &node.right)
+            } else {
+                (&node.right, &node.left)
+            };
+
+            let sibling_hash = Self::hash_node(sibling.as_deref());
+            path.push(sibling_hash);
+
+            current = next_node.as_deref()?;
+            depth += 1;
+        }
+
+        if let TreeNode::Stem(stem_node) = current {
+            if stem_node.stem != stem {
+                return None; // mismatched stem
+            }
+            let value = stem_node.values[subindex].clone();
+            Some(MerkleProof {
+                path,
+                value,
+                subindex,
+                stem,
+            })
+        } else {
+            None
+        }
+    }
+
+    fn hash_node(node: Option<&TreeNode>) -> [u8; 32] {
+        match node {
+            None => [0; 32],
+            Some(TreeNode::Internal(internal)) => {
+                let left = Self::hash_node(internal.left.as_deref());
+                let right = Self::hash_node(internal.right.as_deref());
+                let mut combined = Vec::with_capacity(64);
+                combined.extend_from_slice(&left);
+                combined.extend_from_slice(&right);
+                Self::hash(&combined)
+            }
+            Some(TreeNode::Stem(node)) => {
+                let mut level: Vec<[u8; 32]> = node
+                    .values
+                    .iter()
+                    .map(|opt| Self::hash(opt.as_deref().unwrap_or(&[0; 64])))
+                    .collect();
+
+                while level.len() > 1 {
+                    let mut new_level = Vec::new();
+                    for pair in level.chunks(2) {
+                        let combined = match pair {
+                            [a, b] => [&a[..], &b[..]].concat(),
+                            [a] => a.to_vec(),
+                            _ => vec![],
+                        };
+                        new_level.push(Self::hash(&combined));
+                    }
+                    level = new_level;
+                }
+
+                let mut buffer = Vec::with_capacity(31 + 1 + 32);
+                buffer.extend_from_slice(&node.stem);
+                buffer.push(0);
+                buffer.extend_from_slice(&level[0]);
+                Self::hash(&buffer)
+            }
+        }
+    }
+
+    fn bytes_to_bits_static(bytes: &[u8]) -> Vec<u8> {
+        bytes
+            .iter()
+            .flat_map(|byte| (0..8).rev().map(move |i| (byte >> i) & 1))
+            .collect()
+    }
+}
+
+pub fn verify_proof(proof: &MerkleProof, root_hash: [u8; 32], key: [u8; 32]) -> bool {
+    let MerkleProof {
+        path,
+        value,
+        subindex,
+        stem,
+    } = proof;
+
+    let mut leaf_hash = {
+        let mut level: Vec<[u8; 32]> = (0..256)
+            .map(|i| {
+                if i == *subindex {
+                    BinaryTree::hash(value.as_deref().unwrap_or(&[0; 64]))
+                } else {
+                    BinaryTree::hash(&[0; 64])
+                }
+            })
+            .collect();
+
+        while level.len() > 1 {
+            let mut new_level = Vec::new();
+            for pair in level.chunks(2) {
+                let combined = match pair {
+                    [a, b] => [&a[..], &b[..]].concat(),
+                    [a] => a.to_vec(),
+                    _ => vec![],
+                };
+                new_level.push(BinaryTree::hash(&combined));
+            }
+            level = new_level;
+        }
+
+        let mut buffer = Vec::with_capacity(31 + 1 + 32);
+        buffer.extend_from_slice(stem);
+        buffer.push(0);
+        buffer.extend_from_slice(&level[0]);
+        BinaryTree::hash(&buffer)
+    };
+
+    let stem_bits = BinaryTree::bytes_to_bits_static(stem);
+
+    for (depth, sibling_hash) in path.iter().rev().enumerate() {
+        let bit = *stem_bits.get(path.len() - 1 - depth).unwrap_or(&0);
+
+        let (left, right) = if bit == 0 {
+            (leaf_hash, *sibling_hash)
+        } else {
+            (*sibling_hash, leaf_hash)
+        };
+
+        let mut combined = Vec::with_capacity(64);
+        combined.extend_from_slice(&left);
+        combined.extend_from_slice(&right);
+        leaf_hash = BinaryTree::hash(&combined);
+    }
+
+    leaf_hash == root_hash
 }

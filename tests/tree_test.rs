@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use eth_binary_tree::tree::{BinaryTree, InternalNode, TreeNode};
+    use eth_binary_tree::tree::{verify_proof, BinaryTree, InternalNode, TreeNode};
     use hex;
 
     fn get_height(node: Option<&TreeNode>) -> usize {
@@ -25,6 +25,21 @@ mod tests {
             hex::encode(tree.merkelize()),
             "694545468677064fd833cddc8455762fe6b21c6cabe2fc172529e0f573181cd5"
         );
+    }
+
+    #[test]
+    fn test_tree_proof() {
+        let mut tree = BinaryTree::new();
+        tree.insert([1u8; 32], [2u8; 32]);
+        tree.insert([3u8; 32], [4u8; 32]);
+        let proof = tree.get_proof([3u8; 32]).unwrap();
+
+        println!("Proof Path: {:?}", proof.path);
+        println!("Stem: {:?}", proof.stem);
+        println!("Subindex: {}", proof.subindex);
+        println!("Value: {:?}", proof.value);
+
+        assert!(verify_proof(&proof, tree.merkelize(), [3u8; 32]));
     }
 
     #[test]

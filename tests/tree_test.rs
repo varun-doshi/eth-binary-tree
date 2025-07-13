@@ -1,6 +1,8 @@
 #[cfg(test)]
 mod tests {
-    use eth_binary_tree::tree::{verify_proof, BinaryTree, InternalNode, TreeNode};
+    use eth_binary_tree::tree::{
+        random_key, random_value, verify_proof, BinaryTree, InternalNode, TreeNode,
+    };
     use hex;
 
     fn get_height(node: Option<&TreeNode>) -> usize {
@@ -208,5 +210,19 @@ mod tests {
         let expected = "e93c209026b8b00d76062638102ece415028bd104e1d892d5399375a323f2218";
 
         assert_eq!(hex::encode(got), expected);
+    }
+
+    #[test]
+    fn test_random_tree_proof() {
+        let mut tree = BinaryTree::new();
+        let (key, value) = (random_key(), random_value());
+        tree.insert(key, value);
+        tree.insert(random_key(), random_value());
+        tree.insert(random_key(), random_value());
+        tree.insert(random_key(), random_value());
+
+        let proof = tree.get_proof(key).unwrap();
+
+        assert!(verify_proof(&proof, tree.merkelize(), key));
     }
 }

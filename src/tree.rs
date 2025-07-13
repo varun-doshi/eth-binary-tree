@@ -1,4 +1,5 @@
 use blake3::Hasher;
+use rand::{Rng, RngCore};
 
 #[derive(Debug, Clone)]
 pub struct StemNode {
@@ -381,4 +382,19 @@ pub fn verify_proof(proof: &MerkleProof, root_hash: [u8; 32], key: [u8; 32]) -> 
     }
 
     leaf_hash == root_hash
+}
+
+pub fn random_key() -> [u8; 32] {
+    let mut rng = rand::rng();
+    let mut key = [0u8; 32];
+    rng.fill_bytes(&mut key);
+    key
+}
+
+/// Generate a random 32-byte value
+pub fn random_value() -> [u8; 32] {
+    let mut rng = rand::rng();
+    let mut value = [0u8; 32];
+    rng.fill_bytes(&mut value);
+    value
 }

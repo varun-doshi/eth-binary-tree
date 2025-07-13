@@ -7,3 +7,4 @@ edition = "2021"
 blake3 = "1.5.5"
 hex = "0.4.3"
 alloy-primitives = { version = "0.8.15", features = ['serde'] }
+rand = "0.9.1"
